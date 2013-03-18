@@ -1,0 +1,144 @@
+var uuid = require('node-uuid');
+var express = require('express');
+var crypto = require('crypto');
+var app = express();
+var AWS = require('aws-sdk');
+AWS.config.loadFromPath('./config/aws.json');
+var s3 = new AWS.S3.Client();
+var dynamo = new AWS.DynamoDB.Client() ;
+
+app.set('view engine', 'ejs');
+app.set('view options', {
+    layout: false
+});
+
+function customHeaders( req, res, next ){
+ app.disable('x-powered-by');
+ res.header("Server", "edeadlock OAuth Server v1.0");
+ next();
+}
+app.use(customHeaders);
+app.use("/html", express.static(__dirname + '/public'));
+
+/*  Need to enable for oauth
+app.use(function(req, res, next){
+	var auth_header = req.headers['authorization'];
+	if(!auth_header) {
+		res.status(401);
+		res.end('Authorization header not found');
+		return;
+	}
+	next();
+});
+*/
+app.use(express.cookieParser());
+app.use(express.session({secret: '3ea8c28773fd47d7be77b5e398542ba9'}));
+app.use(app.router);
+
+app.get('/oauth/register', function(req, res){
+
+	var app_name = req.query["app_name"];
+	if(app_name!=null) {
+		
+		var app_desc = req.query["app_desc"];
+		var app_callback = req.query["app_callback"]
+		var consumer_key = uuid.v4().replace(/-/g,"")
+		var consumer_secret = crypto.randomBytes(32).toString('hex')
+		var user_id = "mythrikiran@yahoo.com"
+		
+		var params = {TableName : 'oauth_consumer', "Item":{
+				"consumer_key":{"S":consumer_key},
+				"consumer_secret":{"S":consumer_secret},
+				"user_id":{"S":user_id},
+				"app_name":{"S":app_name},
+				"app_desc":{"S":app_desc},
+				"callback_url":{"S":app_callback}
+			} 
+		};
+
+		dynamo.putItem(params, function(err, data) {
+			if (err)
+			  console.log(err)
+			else
+			  console.log(data.Item.S('consumer_key')); 
+		});
+		
+		var params = {TableName : 'oauth_key_user', "Item":{
+				"consumer_key":{"S":consumer_key},
+				"user_id":{"S":user_id}
+			} 
+		};
+
+		dynamo.putItem(params, function(err, data) {
+			if (err)
+			  console.log(err)
+			else
+			  console.log(data.Item.S('consumer_key')); 
+		});
+	}
+
+	var AttributesToGet = new Array("user_id", "app_name", "app_desc","consumer_key","consumer_secret");
+	var params = {"TableName" : "oauth_consumer", "ScanFilter":{ "user_id": { "AttributeValueList":[{"S" : "mythrikiran@yahoo.com"}], "ComparisonOperator": "EQ"} }, "AttributesToGet": AttributesToGet };
+
+	dynamo.scan(params, function(err, data) {
+		if (err)
+		  console.log(err)
+		else { 
+		  var token = crypto.randomBytes(32);
+			res.render('register', {
+				apps: data.Items
+			});	
+		}
+	});
+});
+
+app.get('/oauth/authorize', function(req, res){
+	var welcome = 'Welcome';
+	if (req.session.logged) {
+		req.session.userId = req.query["user"];
+		console.log(req.query["user"]);
+		res.render('home', {
+			welcome: 'Welcome back! '+req.query["user"],
+			body : 'Mythri Pericharla'
+		});
+	}
+    else {
+		req.session.logged = true;
+		res.render('login', {
+			welcome: 'Welcome',
+			body : 'Mythri Pericharla'
+		});
+	}	
+});
+
+
+app.get('/oauth/request_token', function(req, res){
+
+	var request_token = uuid.v4().replace(/-/g,"")
+	var params = {TableName : 'request_token', "Item":{
+		"consumer_key":{"S":consumer_key},
+		"request_token":{"S":request_token}
+		} 
+	};
+
+	dynamo.putItem(params, function(err, data) {
+		if (err)
+			console.log(err)
+		else {
+			console.log(data.Item.S('consumer_key')); 
+			res.render('token', {
+				body : request_token
+			});
+		}
+	});
+	
+});
+
+app.get('/oauth/auth_token', function(req, res){
+	res.render('token', {
+		body : uuid.v4().replace(/-/g,"")
+	});
+});
+
+app.listen(80);
+console.log('Server listening on port 80...');
