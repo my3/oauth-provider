@@ -113,25 +113,7 @@ app.get('/oauth/authorize', function(req, res){
 
 
 app.get('/oauth/request_token', function(req, res){
-
-	var request_token = uuid.v4().replace(/-/g,"")
-	var params = {TableName : 'request_token', "Item":{
-		"consumer_key":{"S":consumer_key},
-		"request_token":{"S":request_token}
-		} 
-	};
-
-	dynamo.putItem(params, function(err, data) {
-		if (err)
-			console.log(err)
-		else {
-			console.log(data.Item.S('consumer_key')); 
-			res.render('token', {
-				body : request_token
-			});
-		}
-	});
-	
+	request_token(req, res);
 });
 
 app.get('/oauth/auth_token', function(req, res){
@@ -139,6 +121,44 @@ app.get('/oauth/auth_token', function(req, res){
 		body : uuid.v4().replace(/-/g,"")
 	});
 });
+
+
+function request_token(req, res) {
+	
+	var required_params = ['oauth_consumer_key','oauth_signature_method','oauth_signature','oauth_timestamp','oauth_nonce','oauth_version','oauth_callback'];
+	var required_params_value = [];
+	for(x in required_params) {
+		if(typeof req.query[required_params[x]] === 'undefined') {res.end("query params missing: "+required_params[x]); return;}
+		required_params[x][x] = req.query[required_params[x]];
+		console.log(required_params[x] +" = "+ required_params_value[x])
+	}
+	
+	var AttributesToGet = new Array("consumer_key", "user_id");
+	var params = {"TableName" : "oauth_key_user", "Key":{ "HashKeyElement": {"S" : String(required_params_value[required_params.indexOf('oauth_consumer_key')]) }}, "AttributesToGet": AttributesToGet };
+
+	dynamo.getItem(params, function(err, data) {
+		if (err)
+		  console.log(err)
+		else {
+		  if(Object.keys(data).length == 1)
+			res.end("Invalid request. Error Code: 1");
+		  else {
+		    var response = data.Item.user_id.S
+		  }
+		}
+	});
+	var oauth_token = uuid.v4().replace(/-/g,"")
+	var oauth_token_secret = crypto.randomBytes(32).toString('hex')
+	var oauth_callback_confirmed = "true"
+	var oauth_expires_in = 3600
+	res.redirect(String(required_params_value[required_params.indexOf('oauth_callback')])
+			+"?oauth_token=" + oauth_token + 
+			"&oauth_token_secret=" + oauth_token_secret +
+			"&oauth_callback_confirmed=" + oauth_callback_confirmed +
+			"&oauth_expires_in=" + oauth_expires_in)
+	
+}
+
 
 app.listen(80);
 console.log('Server listening on port 80...');
