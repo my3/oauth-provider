@@ -113,6 +113,32 @@ app.get('/oauth/authorize', function(req, res){
 
 
 app.get('/oauth/request_token', function(req, res){
+
+/*
+	//Auth header
+	console.log(req.headers['authorization'])
+	var auth_header = req.headers['authorization']
+	if(typeof auth_header !== 'undefined') {
+		var auth_header_req = auth_header.split(" ")
+		var oauth_header = auth_header_req[0]
+		if(oauth_header === 'OAuth') {
+			var auth_headers = auth_header_req[1].split(",")
+			console.log("type = "+oauth_header)
+			console.log("elements = "+auth_headers[0])
+		}
+	}
+	
+	//POST body
+	var content_type = req.headers['content-type']
+	if(typeof content_type !== 'undefined') {
+		if(content_type === 'application/x-www-form-urlencoded') {
+			console.log('check POST body')
+		}
+	}
+	
+*/
+	
+	//query params
 	request_token(req, res);
 });
 
@@ -122,26 +148,52 @@ app.get('/oauth/auth_token', function(req, res){
 	});
 });
 
+app.get('/oauth/test', function(req, res){
+	var fruits = ["Banana", "Orange", "Apple", "Mango"];
+	fruits.sort();
+	res.write(req.method + ' ' + req.protocol + '://' + req.host + req.url);
+	res.end('\r\n'+fruits[0]);
+});
+
 
 function request_token(req, res) {
 	
-	var required_params = ['oauth_consumer_key','oauth_signature_method','oauth_signature','oauth_timestamp','oauth_nonce','oauth_version','oauth_callback'];
-	var required_params_value = [];
-	for(x in required_params) {
-		if(typeof req.query[required_params[x]] === 'undefined') {res.end("query params missing: "+required_params[x]); return;}
-		required_params[x][x] = req.query[required_params[x]];
-		console.log(required_params[x] +" = "+ required_params_value[x])
+	var required = ['oauth_consumer_key','oauth_signature_method','oauth_signature','oauth_timestamp','oauth_nonce','oauth_callback'];
+	var required_value = [];
+	var required_ordered = [];
+	var required_tosign;
+	required_tosign = req.method + '&' + encodeURIComponent(req.protocol + '://' + req.host + req.route.path) + '&'
+	for(x in required) {
+		if(typeof req.query[required[x]] === 'undefined') {res.end("query params missing: "+required[x]); return;}
+		required_value[x] = req.query[required[x]];
+		//console.log(required[x] +" = "+ required_value[x])
+		required_ordered[x]=required[x] +'='+ required_value[x]
 	}
+	required_ordered.sort()
+	for(x in required_ordered) {
+		required_tosign = required_tosign + encodeURIComponent(required_ordered[x]);
+	}
+	console.log(required_tosign)
+	
+
+	var signatureMethod = required_value[required.indexOf('oauth_signature_method')];
+	if( signatureMethod.toUpperCase() != "PLAINTEXT" && signatureMethod.toUpperCase() != "HMAC-SHA1") { res.end("signature type not allowed: use 'PLAINTEXT' or 'HMAC-SHA1'"); return; }
+	
+	var version = required_value[required.indexOf('oauth_version')];
+	if( version != "1.0" ) { res.end("versions allowed: 1.0"); return; }
 	
 	var AttributesToGet = new Array("consumer_key", "user_id");
-	var params = {"TableName" : "oauth_key_user", "Key":{ "HashKeyElement": {"S" : String(required_params_value[required_params.indexOf('oauth_consumer_key')]) }}, "AttributesToGet": AttributesToGet };
+	var params = {"TableName" : "oauth_key_user", "Key":{ "HashKeyElement": {"S" : String(required_value[required.indexOf('oauth_consumer_key')]) }}, "AttributesToGet": AttributesToGet };
 
 	dynamo.getItem(params, function(err, data) {
-		if (err)
+		if (err) {
 		  console.log(err)
+		  res.end("Invalid request."); return;
+		}
 		else {
-		  if(Object.keys(data).length == 1)
-			res.end("Invalid request. Error Code: 1");
+		  if(Object.keys(data).length == 1) {
+			res.end("Invalid request. Error Code: 1"); return;
+		  }
 		  else {
 		    var response = data.Item.user_id.S
 		  }
@@ -151,11 +203,53 @@ function request_token(req, res) {
 	var oauth_token_secret = crypto.randomBytes(32).toString('hex')
 	var oauth_callback_confirmed = "true"
 	var oauth_expires_in = 3600
-	res.redirect(String(required_params_value[required_params.indexOf('oauth_callback')])
+	res.redirect(String(required_value[required.indexOf('oauth_callback')])
 			+"?oauth_token=" + oauth_token + 
 			"&oauth_token_secret=" + oauth_token_secret +
 			"&oauth_callback_confirmed=" + oauth_callback_confirmed +
 			"&oauth_expires_in=" + oauth_expires_in)
+	
+}
+
+
+function access_token(req, res) {
+	
+	var required = ['oauth_consumer_key','oauth_token','oauth_signature_method','oauth_signature','oauth_timestamp',
+			'oauth_nonce','oauth_version','oauth_verifier'];
+	var required_value = [];
+	for(x in required) {
+		if(typeof req.query[required[x]] === 'undefined') {res.end("query params missing: "+required[x]); return;}
+		required_value[x] = req.query[required[x]];
+		console.log(required[x] +" = "+ required_value[x])
+	}
+
+	var signatureMethod = required_value[required.indexOf('oauth_signature_method')];
+	if( signatureMethod.toUpperCase() != "PLAINTEXT" && signatureMethod.toUpperCase() != "HMAC-SHA1") { res.end("signature type not allowed: use 'PLAINTEXT' or 'HMAC-SHA1'"); return; }
+	
+	var version = required_value[required.indexOf('oauth_version')];
+	if( version != "1.0" ) { res.end("versions allowed: 1.0"); return; }
+	
+	var AttributesToGet = new Array("consumer_key", "user_id");
+	var params = {"TableName" : "oauth_key_user", "Key":{ "HashKeyElement": {"S" : String(required_value[required.indexOf('oauth_consumer_key')]) }}, "AttributesToGet": AttributesToGet };
+
+	dynamo.getItem(params, function(err, data) {
+		if (err) {
+		  console.log(err)
+		  res.end("Invalid request."); return;
+		}
+		else {
+		  if(Object.keys(data).length == 1) {
+			res.end("Invalid request. Error Code: 1"); return;
+		  }
+		  else {
+		    var response = data.Item.user_id.S
+		  }
+		}
+	});
+	var oauth_token = uuid.v4().replace(/-/g,"")
+	var oauth_token_secret = crypto.randomBytes(32).toString('hex')
+	res.redirect("oauth_token=" + oauth_token + 
+			"&oauth_token_secret=" + oauth_token_secret)
 	
 }
 
