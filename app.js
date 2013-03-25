@@ -167,13 +167,16 @@ function request_token(req, res) {
 		if(typeof req.query[required[x]] === 'undefined') {res.end("query params missing: "+required[x]); return;}
 		required_value[x] = req.query[required[x]];
 		//console.log(required[x] +" = "+ required_value[x])
-		required_ordered[x]=required[x] +'='+ required_value[x]
+		if(required[x] !== 'oauth_signature')
+			required_ordered[x]=required[x] +'='+ required_value[x]
 	}
 	required_ordered.sort()
 	for(x in required_ordered) {
 		required_tosign = required_tosign + encodeURIComponent(required_ordered[x]);
 	}
 	console.log(required_tosign)
+	var signature = crypto.createHmac('sha1', 'gfyitftyifyftft').update(required_tosign).digest('hex')
+	console.log(signature)
 	
 
 	var signatureMethod = required_value[required.indexOf('oauth_signature_method')];
