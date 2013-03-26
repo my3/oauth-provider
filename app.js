@@ -1,6 +1,7 @@
 var uuid = require('node-uuid');
 var express = require('express');
 var crypto = require('crypto');
+var openid = require('openid');
 var app = express();
 var AWS = require('aws-sdk');
 AWS.config.loadFromPath('./config/aws.json');
@@ -35,16 +36,74 @@ app.use(express.cookieParser());
 app.use(express.session({secret: '3ea8c28773fd47d7be77b5e398542ba9'}));
 app.use(app.router);
 
+var relyingParty = new openid.RelyingParty(
+    'http://localhost/login/verify', // Verification URL (yours)
+    null, // Realm (optional, specifies realm for OpenID authentication)
+    false, // Use stateless verification
+    false, // Strict mode
+    [				new openid.AttributeExchange(
+                      {
+                        "http://axschema.org/contact/email": "required",
+                        "http://axschema.org/namePerson/friendly": "required",
+                        "http://axschema.org/namePerson": "required"
+                      })]); // List of extensions to enable and include
+
+app.get('/login', function(req, res){
+	if(req.session.logged === true)
+		res.redirect("/oauth/register")
+	else
+		res.redirect("/html/index.html")
+});
+
+app.get('/logout', function(req, res){
+	req.session.logged = false;
+	req.session.userId = null;
+	res.end("Good bye :(")
+});
+					  
+app.get('/login/authenticate', function(request, response) {
+	var identifier = request.query.openid_identifier;
+
+	// Resolve identifier, associate, and build authentication URL
+	relyingParty.authenticate(identifier, false, function(error, authUrl) 	{
+		if (error) {
+			response.writeHead(200);
+			response.end('Authentication failed: ' + error.message);
+		}
+		else if (!authUrl) {
+			response.writeHead(200);
+			response.end('Authentication failed');
+		}
+		else {
+			response.writeHead(302, { Location: authUrl });
+			response.end();
+		}
+	});
+});
+	
+app.get('/login/verify', function(req, res) {
+	// Verify identity assertion
+	// NOTE: Passing just the URL is also possible
+	relyingParty.verifyAssertion(req, function(error, result) {
+		if(!error && result.authenticated) {
+			req.session.logged = true
+			req.session.userId = result.email
+			res.redirect("/oauth/register");
+		}
+	});
+});
+
 app.get('/oauth/register', function(req, res){
 
-	var app_name = req.query["app_name"];
+	var app_name = req.query["app_name"]
+	var user_id = req.session.userId
 	if(app_name!=null) {
 		
 		var app_desc = req.query["app_desc"];
 		var app_callback = req.query["app_callback"]
 		var consumer_key = uuid.v4().replace(/-/g,"")
 		var consumer_secret = crypto.randomBytes(32).toString('hex')
-		var user_id = "mythrikiran@yahoo.com"
+		
 		
 		var params = {TableName : 'oauth_consumer', "Item":{
 				"consumer_key":{"S":consumer_key},
@@ -78,7 +137,7 @@ app.get('/oauth/register', function(req, res){
 	}
 
 	var AttributesToGet = new Array("user_id", "app_name", "app_desc","consumer_key","consumer_secret");
-	var params = {"TableName" : "oauth_consumer", "ScanFilter":{ "user_id": { "AttributeValueList":[{"S" : "mythrikiran@yahoo.com"}], "ComparisonOperator": "EQ"} }, "AttributesToGet": AttributesToGet };
+	var params = {"TableName" : "oauth_consumer", "ScanFilter":{ "user_id": { "AttributeValueList":[{"S" : user_id}], "ComparisonOperator": "EQ"} }, "AttributesToGet": AttributesToGet };
 
 	dynamo.scan(params, function(err, data) {
 		if (err)

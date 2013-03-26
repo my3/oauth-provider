@@ -1,0 +1,85 @@
+/* central authentication service stylesheet */
+@media screen {
+body {
+	background-color:#d9d8d4; }
+	
+p {
+	font:0.75em Arial, Helvetica, sans-serif;
+	margin:0;
+	padding:0; }
+
+h3 {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.95em;
+	margin-bottom:3px;
+	color:#333; }
+	
+a { text-decoration:none; }
+a:link, a:visited { color:#008542; }
+a:active, a:hover { color:#c75b12; }
+a img { border:0; }
+
+
+
+#loginbox {
+	border:1px solid #cac9c7;
+	width:342px;
+	background:#fff; }
+#loginbox p { 
+	line-height:1.5em; }
+
+
+/* login form */
+form {
+	text-align:right;
+	width:300px; }
+form input.input-box { border:1px solid #cac9c7; }
+form input.input-box:focus { border:1px solid #348FBC; }
+
+
+/* ###################################### */
+
+/* error page */
+/*#error .section { width:300px; }
+img.red-arrow { float:left; }
+#error .one { float:left; margin-left:50px; padding-top:19px; }
+#error .one h3 { padding-top:20px; }
+#error .two { float:right; margin-right:45px; }
+#error img.red-arrow { padding:0 11px 0 19px; } */
+
+
+/* logout page */
+/*#logout .one { float:left; background:url(img/logout.gif) no-repeat; width:315px; height:105px; margin-top:52px; padding-top:0; } 
+#logout .one h3 { color:#fff; margin:47px 0 0 35px; }
+#logout .two { float:right; width:320px; margin-right:35px; padding-top:38px;  } */
+
+
+/* help screen */
+/*body#help { background:none; }
+body#help #header { height:95px; background:url(img/help-bg.gif) no-repeat; }
+body#help #cas { margin-top:12px; } 
+body#help #logo a { margin-top:12px; } 
+body#help #content { width:590px; margin-left:85px; height:auto; }
+body#help h3 { margin-top:3px; clear:both; width:195px; text-align:right; margin-right:40px; float:left; }
+body#help p { width:345px; float:right; }
+body#help #footer { height:133px; }*/
+
+/* ###################################### */
+
+
+/* footer elements */
+#footer {
+	width:340px;
+	margin:10px auto; }
+#footer p {
+	font-size: 0.9em;
+	line-height:1.2em;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 0.7em;
+	color:#777;
+	text-align:justify; }
+#footer a { color:#008542; }
+
+	
+}
+
