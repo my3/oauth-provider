@@ -48,7 +48,26 @@ var relyingParty = new openid.RelyingParty(
                         "http://axschema.org/namePerson": "required"
                       })]); // List of extensions to enable and include
 
+var devrelyingParty = new openid.RelyingParty(
+    'http://localhost/login/verify', // Verification URL (yours)
+    null, // Realm (optional, specifies realm for OpenID authentication)
+    false, // Use stateless verification
+    false, // Strict mode
+    [				new openid.AttributeExchange(
+                      {
+                        "http://axschema.org/contact/email": "required",
+                        "http://axschema.org/namePerson/friendly": "required",
+                        "http://axschema.org/namePerson": "required"
+                      })]); // List of extensions to enable and include
+					  
 app.get('/login', function(req, res){
+	if(req.session.logged === true)
+		res.redirect("/oauth/authorize")
+	else
+		res.redirect("/html/index.html")
+});
+
+app.get('/dev/login', function(req, res){
 	if(req.session.logged === true)
 		res.redirect("/oauth/register")
 	else
